@@ -9,7 +9,7 @@ test('rutas: lecturas permitidas, el resto 404, validación sin red y sin conexi
     const send = (method, path, body) => fetch(base + path, { method, headers: { 'content-type': 'application/json' }, body: body && JSON.stringify(body) });
     const original = console.error; console.error = () => {};
     try {
-        for (const catalog of [...Object.keys(CATALOGS), 'usuarios-books', 'abogados/3']) {
+        for (const catalog of [...Object.keys(CATALOGS), 'usuarios-books', 'abogados/3', 'config-despacho', 'conceptos-factura', 'conceptos-factura/faltantes', 'articulos-books']) {
             const r = await send('GET', '/' + catalog);
             assert.equal(r.status, 503, catalog);
             assert.equal((await r.json()).stage, 'connection');
@@ -25,5 +25,17 @@ test('rutas: lecturas permitidas, el resto 404, validación sin red y sin conexi
         r = await send('PATCH', '/abogados/3', { activo: true });
         assert.equal(r.status, 503); assert.equal((await r.json()).outcome_unknown, false);
         assert.equal((await send('POST', '/abogados/3/sincronizar-books')).status, 503);
+        // Despacho: validación sin red; lo válido llega a la conexión (503)
+        assert.equal((await send('PATCH', '/config-despacho', { otra: { a: 1 } })).status, 400);
+        assert.equal((await send('PATCH', '/config-despacho', { factura: { modo: 'tarea' } })).status, 503);
+        assert.equal((await send('POST', '/config-despacho/restablecer', { seccion: 'x' })).status, 400);
+        assert.equal((await send('POST', '/config-despacho/restablecer', {})).status, 503);
+        assert.equal((await send('PATCH', '/conceptos-factura/otro', { item_id_es: '1' })).status, 400);
+        assert.equal((await send('POST', '/conceptos-factura/crear-en-books', { confirmar: 1 })).status, 404); // crear en Books no existe aquí
+        assert.equal((await send('POST', '/tipos-abogado', { nombre: 'Socio' })).status, 400);
+        assert.equal((await send('POST', '/tipos-abogado', { nombre: 'Socio', tarifa_mxn: 1 })).status, 503);
+        assert.equal((await send('PATCH', '/tareas-estandar/9', { activo: false })).status, 503);
+        assert.equal((await send('DELETE', '/tareas-estandar/9')).status, 404);
+        assert.equal((await send('DELETE', '/tipos-abogado/9')).status, 503);
     } finally { server.close(); console.error = original; }
 });

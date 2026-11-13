@@ -1,9 +1,10 @@
 "use strict";
-// Función del proyecto Configuración (Catalyst): configuración de abogados del despacho. Todo pasa
+// Función del proyecto Configuración (Catalyst): abogados y configuración del despacho. Todo pasa
 // por ReportesSandbox (core/PrebillApiClient). NO escribe en Books ni crea Usuarios de Books.
 import express from 'express';
 import dotenv from 'dotenv';
 import AbogadoConfigService from './services/AbogadoConfigService.js';
+import DespachoService, { CATALOGOS } from './services/DespachoService.js';
 import { registerCatalogRoutes } from './core/catalogs.js';
 import { sendError } from './core/http.js';
 
@@ -25,11 +26,28 @@ app.get('/:organizationId/abogados/:abogadoId', route('Error interno consultando
 app.patch('/:organizationId/abogados/:abogadoId', route('Error interno actualizando el abogado.', req => abogados(req).update(req.params.abogadoId, req.body)));
 app.post('/:organizationId/abogados/:abogadoId/sincronizar-books', route('Error interno sincronizando el abogado.', req => abogados(req).sincronizar(req.params.abogadoId)));
 
+// ── Despacho ─────────────────────────────────────────────────────────────────
+const despacho = req => new DespachoService(req.params.organizationId, { req });
+app.get('/:organizationId/config-despacho', route('Error interno consultando la configuración.', req => despacho(req).config()));
+app.patch('/:organizationId/config-despacho', route('Error interno guardando la configuración.', req => despacho(req).updateConfig(req.body)));
+app.post('/:organizationId/config-despacho/restablecer', route('Error interno restableciendo la configuración.', req => despacho(req).restablecer(req.body)));
+app.get('/:organizationId/conceptos-factura', route('Error interno consultando los conceptos.', req => despacho(req).conceptos()));
+app.get('/:organizationId/conceptos-factura/faltantes', route('Error interno consultando los conceptos.', req => despacho(req).conceptosFaltantes()));
+app.patch('/:organizationId/conceptos-factura/:clave', route('Error interno vinculando el concepto.', req => despacho(req).updateConcepto(req.params.clave, req.body)));
+app.get('/:organizationId/articulos-books', route('Error interno consultando artículos de Books.', req => despacho(req).articulos()));
+for (const name of Object.keys(CATALOGOS)) {
+    app.post(`/:organizationId/${name}`, route('Error interno guardando el catálogo.', req => despacho(req).createItem(name, req.body)));
+    app.patch(`/:organizationId/${name}/:id`, route('Error interno guardando el catálogo.', req => despacho(req).updateItem(name, req.params.id, req.body)));
+    if (CATALOGOS[name].deletable) app.delete(`/:organizationId/${name}/:id`, route('Error interno borrando del catálogo.', req => despacho(req).deleteItem(name, req.params.id)));
+}
+
 // ── Lecturas permitidas (GET /:organizationId/<catalogo>) y filtros que se reenvían ──
 export const CATALOGS = {
     abogados: [],
     'tipos-abogado': [],
     responsables: [],
+    'tareas-estandar': ['todos'],
+    'categorias-gasto': ['todos'],
 };
 registerCatalogRoutes(app, CATALOGS);
 
