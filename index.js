@@ -1,10 +1,11 @@
 "use strict";
-// Función del proyecto Configuración (Catalyst): abogados y configuración del despacho. Todo pasa
+// Función del proyecto Configuración (Catalyst): abogados, configuración del despacho y tarifas y clientes. Todo pasa
 // por ReportesSandbox (core/PrebillApiClient). NO escribe en Books ni crea Usuarios de Books.
 import express from 'express';
 import dotenv from 'dotenv';
 import AbogadoConfigService from './services/AbogadoConfigService.js';
 import DespachoService, { CATALOGOS } from './services/DespachoService.js';
+import TarifaClienteService from './services/TarifaClienteService.js';
 import { registerCatalogRoutes } from './core/catalogs.js';
 import { sendError } from './core/http.js';
 
@@ -41,6 +42,16 @@ for (const name of Object.keys(CATALOGOS)) {
     if (CATALOGOS[name].deletable) app.delete(`/:organizationId/${name}/:id`, route('Error interno borrando del catálogo.', req => despacho(req).deleteItem(name, req.params.id)));
 }
 
+// ── Tarifas y clientes (general y de cliente; las de abogado, nivel y proyecto tienen su propio lugar) ──
+const tarifas = req => new TarifaClienteService(req.params.organizationId, { req });
+app.get('/:organizationId/tarifas/cobertura', route('Error interno consultando la cobertura de tarifas.', req => tarifas(req).cobertura()));
+app.post('/:organizationId/tarifas', route('Error interno guardando la tarifa.', req => tarifas(req).createTarifa(req.body)));
+app.patch('/:organizationId/tarifas/:tarifaId', route('Error interno actualizando la tarifa.', req => tarifas(req).updateTarifa(req.params.tarifaId, req.body)));
+app.delete('/:organizationId/tarifas/:tarifaId', route('Error interno borrando la tarifa.', req => tarifas(req).deleteTarifa(req.params.tarifaId)));
+app.get('/:organizationId/impuestos', route('Error interno consultando impuestos.', req => tarifas(req).impuestos()));
+app.get('/:organizationId/clientes/:clienteId/config', route('Error interno consultando el cliente.', req => tarifas(req).clienteConfig(req.params.clienteId)));
+app.patch('/:organizationId/clientes/:clienteId/config', route('Error interno guardando el cliente.', req => tarifas(req).updateClienteConfig(req.params.clienteId, req.body)));
+
 // ── Lecturas permitidas (GET /:organizationId/<catalogo>) y filtros que se reenvían ──
 export const CATALOGS = {
     abogados: [],
@@ -48,6 +59,8 @@ export const CATALOGS = {
     responsables: [],
     'tareas-estandar': ['todos'],
     'categorias-gasto': ['todos'],
+    clientes: [],
+    tarifas: ['moneda', 'cliente_id', 'abogado_id', 'tipo_id', 'nivel'],
 };
 registerCatalogRoutes(app, CATALOGS);
 

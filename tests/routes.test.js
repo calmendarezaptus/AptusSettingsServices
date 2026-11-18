@@ -37,5 +37,16 @@ test('rutas: lecturas permitidas, el resto 404, validación sin red y sin conexi
         assert.equal((await send('PATCH', '/tareas-estandar/9', { activo: false })).status, 503);
         assert.equal((await send('DELETE', '/tareas-estandar/9')).status, 404);
         assert.equal((await send('DELETE', '/tipos-abogado/9')).status, 503);
+        // Tarifas y clientes
+        for (const path of ['/tarifas/cobertura', '/impuestos', '/clientes/446794000015629019/config']) assert.equal((await send('GET', path)).status, 503, path);
+        assert.equal((await send('POST', '/tarifas', { moneda: 'MXN', tarifa: 1000 })).status, 503);
+        assert.equal((await send('POST', '/tarifas', { moneda: 'MXN', tarifa: 1000, abogado_id: 3 })).status, 403);
+        assert.equal((await send('POST', '/tarifas', { moneda: 'MXN', tarifa: 1000, proyecto_id: 3 })).status, 403);
+        assert.equal((await send('POST', '/tarifas', { moneda: 'MXN', tarifa: -1 })).status, 400);
+        assert.equal((await send('PATCH', '/tarifas/x', { tarifa: 1 })).status, 400);
+        assert.equal((await send('PATCH', '/tarifas/10', { tarifa: 1 })).status, 503);
+        assert.equal((await send('DELETE', '/tarifas/10')).status, 503);
+        assert.equal((await send('PATCH', '/clientes/9/config', { idioma: 'fr' })).status, 400);
+        assert.equal((await send('PATCH', '/clientes/9/config', { idioma: 'en' })).status, 503);
     } finally { server.close(); console.error = original; }
 });
